@@ -115,7 +115,8 @@ class DDIMSampler(object):
                       callback=None, timesteps=None, quantize_denoised=False,
                       mask=None, x0=None, img_callback=None, log_every_t=100,
                       temperature=1., noise_dropout=0., score_corrector=None, corrector_kwargs=None,
-                      unconditional_guidance_scale=1., unconditional_conditioning=None,):
+                      unconditional_guidance_scale=1., unconditional_conditioning=None,
+                      seed=None):
         device = self.model.betas.device
         b = shape[0]
         if x_T is None:
@@ -131,20 +132,26 @@ class DDIMSampler(object):
 
         intermediates = {'x_inter': [img], 'pred_x0': [img]}
         time_range = reversed(range(0,timesteps)) if ddim_use_original_steps else np.flip(timesteps)
+        seed_range = np.arange(seed, 1 + time_range.__len__()) if seed is None else [seed] * time_range.__len__()
         total_steps = timesteps if ddim_use_original_steps else timesteps.shape[0]
-        print(f"Running DDIM Sampling with {total_steps} timesteps")
+        if seed is None:
+            print(f"Running DDIM sampling with {total_steps} timesteps")
+        else:
+            print(f"Running DDIM seeded sampling with {total_steps} timesteps and seed {seed}")
 
         iterator = tqdm(time_range, desc='DDIM Sampler', total=total_steps)
 
-        for i, step in enumerate(iterator):
+        for i, (step, seed) in enumerate(zip(iterator, seed_range)):
             index = total_steps - i - 1
             ts = torch.full((b,), step, device=device, dtype=torch.long)
 
             if mask is not None:
                 assert x0 is not None
+                torch.manual_seed(seed)
                 img_orig = self.model.q_sample(x0, ts)  # TODO: deterministic forward pass?
                 img = img_orig * mask + (1. - mask) * img
-
+            
+            torch.manual_seed(seed)
             outs = self.p_sample_ddim(img, cond, ts, index=index, use_original_steps=ddim_use_original_steps,
                                       quantize_denoised=quantize_denoised, temperature=temperature,
                                       noise_dropout=noise_dropout, score_corrector=score_corrector,
@@ -156,8 +163,10 @@ class DDIMSampler(object):
             if img_callback: img_callback(pred_x0, i)
 
             if index % log_every_t == 0 or index == total_steps - 1:
-                intermediates['x_inter'].append(img)
+                # intermediates['x_inter'].append(img)
                 intermediates['pred_x0'].append(pred_x0)
+                if mask is not None:
+                    intermediates['img_orig'].append(img_orig)
 
         return img, intermediates
 
