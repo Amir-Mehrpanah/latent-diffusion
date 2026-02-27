@@ -209,7 +209,7 @@ class DDIMSampler(object):
         )
         seed_range = self.get_seed_sequence(seed, time_range)
         total_steps = timesteps if ddim_use_original_steps else timesteps.shape[0]
-        
+
         # if seed is None:
         #     print(f"Running DDIM sampling with {total_steps} timesteps")
         # else:
@@ -218,9 +218,9 @@ class DDIMSampler(object):
         #     )
 
         # iterator = tqdm(time_range, desc="DDIM Sampler", total=total_steps)
-        
+
         iterator = time_range
-        
+
         for i, (step, seed) in enumerate(zip(iterator, seed_range)):
             index = total_steps - i - 1
             ts = torch.full((b,), step, device=device, dtype=torch.long)
@@ -273,7 +273,7 @@ class DDIMSampler(object):
             # user-provided seed sequence
             assert len(seed) == len(
                 time_range
-            ), "Length of seed sequence must match number of timesteps"
+            ), f"Length of seed sequence must match number of timesteps ({len(time_range)}) but got {len(seed)}"
             return seed
         elif seed == "fixed_across_runs":
             # fixed seed sequence that is the same across runs
